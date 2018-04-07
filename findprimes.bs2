@@ -1,0 +1,115 @@
+' ============================================================================
+'
+' {$STAMP BS2}
+' {$PBASIC 2.5}
+' ============================================================================
+
+' -----[ Pins/Constants/Variables ]-------------------------------------------
+SDA            PIN      14  'P0 transceives to/from SDA
+SCL            PIN      15  'P1 sends clock pulses
+START          PIN      13  'Button to select true/magnetic north mode
+DRDY           PIN      12  'Indicates data is ready
+
+
+' ---------- DL1414 constants and variables ---------------------
+D0  PIN 0
+D1  PIN 1
+D2  PIN 2
+D3  PIN 3
+D4  PIN 4
+D5  PIN 5
+D6  PIN 6
+nWE74 PIN 9
+nWE30 PIN 8
+A0    PIN 10
+A1    PIN 11
+
+char VAR Byte
+led VAR Byte
+i VAR Byte
+
+Arg0 VAR Word
+Arg1 VAR Word
+N     VAR Word
+M     VAR Word
+
+Digits DATA "0123456789ABCDEF"
+
+'LedBufferLen CON 8
+'LedBuffer VAR Byte(LedBufferLen)
+
+
+' -----[ Main Routine ]-------------------------------------------------------
+
+  DIRS = %0000111101111111
+  GOSUB ClearDisplay
+  GOSUB TestAll
+
+WaitForStart:
+  'DEBUG CLS
+  DEBUG CR, "From:" : DEBUGIN DEC5 Arg0
+  DEBUG CR, "  To:" : DEBUGIN DEC5 Arg1
+  'IF (START = 1) THEN GOTO WaitForStart
+  i = 0
+  n = Arg0
+LoopN:
+  IF (n > Arg1) THEN GOTO WaitForStart
+  IF (n < 2) THEN GOTO NextN
+  IF (n < 4) THEN GOTO FoundPrime '2, 3
+  m = 1
+NextM:
+  m = m + 1
+  'DEBUG CR, "Trying n = ", DEC n, " m = ", DEC m
+  IF (n // m = 0) THEN GOTO NextN
+  IF (m * m >= n) THEN GOTO FoundPrime
+  GOTO NextM
+FoundPrime:
+  GOSUB PrintN
+NextN:
+  n = n + 1
+  GOTO LoopN
+
+PrintN:
+  i = i + 1
+  DEBUG CR, "(", DEC i, ") PRIME = ", DEC N
+  RETURN
+
+' ----- Display on 2 DL1414 LEDs ------------------------------------------
+DisplayCharOnLed:
+    char = char & %01111111 ' only 7 pins for character data
+    IF (char >= "a") AND (char <="z") THEN   ' convert lowercase to uppercase
+      char = char - 32
+    ENDIF
+    OUTL = char ' put code to data lines
+    LOOKUP (led & %00000011), [%11110011, %11110111, %11111011, %11111111], OUTH ' put out address for digits
+    IF ((led & 7) > 3) THEN
+      'DEBUG "displayed '", STR char,"' on lower DL1414 position ",DEC pos,CR
+      LOW nWE74
+      HIGH nWE74
+    ELSE
+      'DEBUG "displayed '", STR char,"' on upper DL1414 position ",DEC pos,CR
+      LOW nWE30
+      HIGH nWE30
+    ENDIF
+    'led = led - 1
+RETURN
+
+TestAll:
+  FOR char = %00100000 TO %01011111
+    FOR led = 0 TO 7
+      GOSUB DisplayCharOnLed
+    NEXT
+    'PAUSE 100
+  NEXT
+  GOSUB ClearDisplay
+RETURN
+
+ClearDisplay:
+  char = " "
+  led = 7
+  FOR i = 0 TO 7
+    'LedBuffer(led) = char
+    GOSUB DisplayCharOnLed
+  NEXT
+RETURN
+
